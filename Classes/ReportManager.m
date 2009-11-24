@@ -280,6 +280,23 @@
 		[scanner scanUpToString:@"</font>" intoString:&errorMessageString];
 	}
 	
+	BOOL keepDownloadedFiled = [[NSUserDefaults standardUserDefaults]  boolForKey:@"KeepDownloadedFiles"];
+	NSString *downloadDirectory = nil;
+	if (keepDownloadedFiled) {
+		BOOL isDir;
+		NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+		downloadDirectory = [[paths objectAtIndex:0] stringByAppendingPathComponent:@"Downloads"];
+		if ([[NSFileManager defaultManager] fileExistsAtPath:downloadDirectory isDirectory:&isDir] == YES) {
+			if (isDir == NO) {
+				// there is a file with this name, so don't download
+				downloadDirectory = nil;
+				// TODO: Provide mesg, and turn off setting
+			} 
+		} else {
+			[[NSFileManager defaultManager] createDirectoryAtPath:downloadDirectory attributes:nil];
+		}
+	}
+
 	for (int i=0; i<=1; i++) {
 		NSString *downloadType;
 		NSString *downloadActionName;
@@ -364,15 +381,26 @@
 			NSMutableURLRequest *dayDownloadRequest = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:dayDownloadActionURLString]];
 			[dayDownloadRequest setHTTPMethod:@"POST"];
 			[dayDownloadRequest setHTTPBody:httpBody];
-			NSData *dayData = [NSURLConnection sendSynchronousRequest:dayDownloadRequest returningResponse:NULL error:NULL];
+			NSURLResponse *response = NULL;
+			NSData *dayData = [NSURLConnection sendSynchronousRequest:dayDownloadRequest returningResponse:&response error:NULL];
 			
 			if (dayData == nil) {
 				[pool release];
 				[self performSelectorOnMainThread:@selector(downloadFailed) withObject:nil waitUntilDone:YES];
 				return;
 			}
-			
-			Day *day = [self dayWithData:dayData compressed:YES];
+			Day *day;
+			if (downloadDirectory != nil) {
+				NSString *filename = [response suggestedFilename];
+				if ([[filename pathExtension] isEqualToString:@"gz"]) {
+					filename = [filename stringByDeletingPathExtension];
+				}
+				NSString *filepath = [downloadDirectory stringByAppendingPathComponent:filename];
+				day = [self dayWithData:dayData compressed:YES keepFilePath:filepath];
+			} else {
+				day = [self dayWithData:dayData compressed:YES keepFilePath:nil];
+			}
+
 			if (day != nil) {
 				if (i != 0)
 					day.isWeek = YES;
@@ -460,8 +488,8 @@
 	[[NSNotificationCenter defaultCenter] postNotificationName:ReportManagerUpdatedDownloadProgressNotification object:self];
 }
 
-- (Day *)dayWithData:(NSData *)dayData compressed:(BOOL)compressed
-{
+- (Day *)dayWithData:(NSData *)dayData compressed:(BOOL)compressed keepFilePath:(NSString *)keepFilePath
+{	
 	if (compressed) {
 		NSString *zipFile = [NSTemporaryDirectory() stringByAppendingPathComponent:@"temp.gz"];
 		NSString *textFile = [NSTemporaryDirectory() stringByAppendingPathComponent:@"temp.txt"];
@@ -478,11 +506,18 @@
 		
 		NSString *text = [NSString stringWithContentsOfFile:textFile encoding:NSUTF8StringEncoding error:NULL];
 		[[NSFileManager defaultManager] removeItemAtPath:zipFile error:NULL];
-		[[NSFileManager defaultManager] removeItemAtPath:textFile error:NULL];
+		if (keepFilePath != nil) {
+			[[NSFileManager defaultManager] moveItemAtPath:textFile toPath:keepFilePath error:NULL];
+		} else {
+			[[NSFileManager defaultManager] removeItemAtPath:textFile error:NULL];
+		}
 		return [[[Day alloc] initWithCSV:text] autorelease];
 	} else {
 		NSString *text = [[NSString alloc] initWithData:dayData encoding:NSUTF8StringEncoding];
 		Day *day = [[[Day alloc] initWithCSV:text] autorelease];
+		if (keepFilePath != nil) {
+			[text writeToFile:keepFilePath atomically:NO encoding:NSUTF8StringEncoding error:NULL];
+		}
 		[text release];
 		return day;
 	}

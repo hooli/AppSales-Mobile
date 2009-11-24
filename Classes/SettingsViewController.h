@@ -41,6 +41,7 @@ AppSalesMobile
 	IBOutlet UILabel *loginSectionLabel;
 	IBOutlet UILabel *currencySectionLabel;
 	IBOutlet UILabel *lastRefreshLabel;
+	IBOutlet UISwitch *keepDownloadedFilesSwitch;
 }
 
 - (IBAction)refreshExchangeRates:(id)sender;

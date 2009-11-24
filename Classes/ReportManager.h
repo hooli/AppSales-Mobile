@@ -41,7 +41,7 @@
 
 - (void)setProgress:(NSString *)status;
 
-- (Day *)dayWithData:(NSData *)dayData compressed:(BOOL)compressed;
+- (Day *)dayWithData:(NSData *)dayData compressed:(BOOL)compressed keepFilePath:(NSString *)keepFilePath;
 - (void)saveData;
 - (NSString *)docPath;
 

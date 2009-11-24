@@ -62,6 +62,8 @@ AppSalesMobile
 		if (password) passwordTextField.text = password;
 	}
 	
+	keepDownloadedFilesSwitch.on = [[NSUserDefaults standardUserDefaults]  boolForKey:@"KeepDownloadedFiles"];
+	
 	[self baseCurrencyChanged]; //set proper currency button title
 	[self currencyRatesDidUpdate]; //set proper refresh date in label
 	
@@ -83,6 +85,8 @@ AppSalesMobile
 							  updateExisting:YES
 									   error:&error];
 	}
+	
+	[[NSUserDefaults standardUserDefaults] setBool:keepDownloadedFilesSwitch.on forKey:@"KeepDownloadedFiles"];
 }
 
 #pragma mark Text Field Delegate 
